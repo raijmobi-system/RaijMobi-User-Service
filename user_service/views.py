@@ -18,4 +18,4 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
     parser_classes = [MultiPartParser, FormParser]  # importante para upload de foto
 
     def get_object(self):
-        return self.request.user
+        return self.request.user.perfil
