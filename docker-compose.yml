@@ -1,0 +1,30 @@
+services:
+  user-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+      sh -c "
+        python manage.py makemigrations user_service &&
+        python manage.py migrate &&
+        python manage.py runserver 0.0.0.0:8000
+      "
+    ports:
+      - "8003:8000"
+    environment:
+      # Permite qualquer host no modo DEBUG
+      - ALLOWED_HOSTS=*
+    volumes:
+      # Persiste o banco SQLite e arquivos de mídia
+      - sqlite_data:/app
+      - media_volume:/app/media
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  sqlite_data:
+  media_volume:
