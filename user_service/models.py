@@ -64,3 +64,20 @@ class Perfil(models.Model):
 
     def __str__(self):
         return f'Perfil de {self.usuario.nome}'
+
+# usuarios/models.py (ou audit/models.py)
+from django.db import models
+from easyaudit.models import CRUDEvent
+from django.contrib.contenttypes.models import ContentType
+
+class UsuarioAudit(CRUDEvent):
+    class Meta:
+        proxy = True
+        verbose_name = 'Auditoria de Usuário'
+        verbose_name_plural = 'Auditorias de Usuários'
+
+class PerfilAudit(CRUDEvent):
+    class Meta:
+        proxy = True
+        verbose_name = 'Auditoria de Perfil'
+        verbose_name_plural = 'Auditorias de Perfis'

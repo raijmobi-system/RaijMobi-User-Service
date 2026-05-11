@@ -2,4 +2,6 @@ django
 djangorestframework
 djangorestframework-simplejwt  
 Pillow
-
+django-easy-audit
+whitenoise
+uvicorn[standard]>=0.30

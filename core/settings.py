@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'rest_framework_simplejwt.token_blacklist',
+    'easyaudit',
     'user_service',
 ]
 
@@ -52,6 +53,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'easyaudit.middleware.easyaudit.EasyAuditMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware', 
 ]
 
 ROOT_URLCONF = 'core.urls'
@@ -119,7 +122,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles' 
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -145,4 +149,18 @@ SIMPLE_JWT = {
     'BLACKLIST_AFTER_ROTATION': True,                    # coloca o refresh antigo na blacklist
     'AUTH_HEADER_TYPES': ('Bearer',),
     # ... outras configurações que desejar
+}
+
+
+EJABY_AUDIT = {
+    'MODELS': [
+        'token_blacklist.BlacklistedToken',
+        # outros modelos que queira auditar
+    ],
+}
+
+
+EASY_AUDIT = {
+    'LOGGING_BACKEND': 'easyaudit.backends.ModelBackend',  # padrão
+    'REGISTER_REQUEST_MIDDLEWARE': True,  # auditar requisições
 }
