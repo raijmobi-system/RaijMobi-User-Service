@@ -48,17 +48,12 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
 
 class Perfil(models.Model):
     TIPO_CHOICES = [('Motorista', 'Motorista'), ('Passageiro', 'Passageiro')]
-    TIPO_CAMPUS = [
-        ('Campus Natal-Central', 'Campus Natal-Central'),
-        ('Campus Mossoró', 'Campus Mossoró'),
-    ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     usuario = models.OneToOneField(Usuario, on_delete=models.CASCADE, related_name='perfil')
     cpf = models.CharField(max_length=14, unique=True, validators=[validar_cpf])
     telefone = models.CharField(max_length=15)
     tipo_usuario = models.CharField(max_length=50, choices=TIPO_CHOICES)
-    tipo_campus = models.CharField(max_length=50, choices=TIPO_CAMPUS)
     foto = models.ImageField(upload_to='fotos_perfil/', null=True, blank=True)
     is_motorista = models.BooleanField(default=False)
 

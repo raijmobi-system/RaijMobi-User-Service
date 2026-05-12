@@ -49,7 +49,6 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     cpf = serializers.CharField(max_length=14, validators=[validar_cpf])
     telefone = serializers.CharField(max_length=15)
     tipo_usuario = serializers.ChoiceField(choices=Perfil.TIPO_CHOICES)
-    tipo_campus = serializers.ChoiceField(choices=Perfil.TIPO_CAMPUS)
     foto = serializers.ImageField(required=False)
 
     password = serializers.CharField(write_only=True, min_length=6)
