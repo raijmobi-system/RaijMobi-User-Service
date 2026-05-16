@@ -5,18 +5,23 @@ services:
       dockerfile: Dockerfile
     command: >
       sh -c "
-        python manage.py makemigrations user_service &&
+        python manage.py makemigrations user_service --noinput &&
         python manage.py migrate &&
+        python manage.py createsuperuser --noinput || true &&
         python manage.py collectstatic --noinput &&
         uvicorn core.asgi:application --host 0.0.0.0 --port 8000
       "
-    ports:
-      - "8003:8000"
+    expose:
+      - "8000"
     environment:
       - ALLOWED_HOSTS=*
+      - DJANGO_SUPERUSER_EMAIL=admin@raijmobi.com
+      - DJANGO_SUPERUSER_NOME=Admin
+      - DJANGO_SUPERUSER_PASSWORD=suasenhaaqui
     container_name: user-service
     networks:
       - raijmobi-network
+
 
 networks:
   raijmobi-network:

@@ -150,8 +150,9 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,                       # gera novo refresh ao usar o refresh
     'BLACKLIST_AFTER_ROTATION': True,                    # coloca o refresh antigo na blacklist
+    'ISSUER': 'raijmobi-app',             # Este nome vai identificar a chave no Kong
+    'SIGNING_KEY': SECRET_KEY,            # A mesma secret key do Django
     'AUTH_HEADER_TYPES': ('Bearer',),
-    # ... outras configurações que desejar
 }
 
 
