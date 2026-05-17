@@ -5,3 +5,4 @@ Pillow
 django-easy-audit
 whitenoise
 uvicorn[standard]>=0.30
+kafka-python
