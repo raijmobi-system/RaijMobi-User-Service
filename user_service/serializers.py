@@ -60,7 +60,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Usuario
-        fields = ['email', 'nome', 'password', 'cpf', 'telefone', 'tipo_usuario', 'foto']
+        fields = ['id','email', 'nome', 'password', 'cpf', 'telefone', 'tipo_usuario', 'foto']
+        # read_only_fields = ['id']
         # password já é write_only, os demais também ficarão
 
     def validate_email(self, value):
