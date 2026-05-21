@@ -49,7 +49,7 @@ class UserRegistrationView(generics.CreateAPIView):
             'id': str(user.id),
             'name': user.nome,
             'email': user.email,
-            'is_rider': perfil.tipo_usuario == 'Passageiro',
+            'is_driver': perfil.is_motorista, 
         }
         try:
             from .kafka_producer import send_user_created_event
