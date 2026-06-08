@@ -4,24 +4,9 @@ from .validators import validar_cpf
 import uuid
 from django.utils import timezone
 
-
-class UsuarioManager(BaseUserManager):
-    def create_user(self, email, password=None, **extra_fields):
-        if not email:
-            raise ValueError('O email é obrigatório')
-        email = self.normalize_email(email)
-        user = self.model(email=email, **extra_fields)
-        user.set_password(password)
-        user.save()
-        return user
-
-    def create_superuser(self, email, password=None, **extra_fields):
-        extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
-        return self.create_user(email, password, **extra_fields)
+from .manager import UsuarioManager
 
 
-# models.py
 class Usuario(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     nome = models.CharField(max_length=255)
@@ -56,6 +41,7 @@ class Perfil(models.Model):
     tipo_usuario = models.CharField(max_length=50, choices=TIPO_CHOICES)
     foto = models.ImageField(upload_to='fotos_perfil/', null=True, blank=True)
     is_motorista = models.BooleanField(default=False)
+    is_verified = models.BooleanField(default=False)
 
     def __str__(self):
         return f'Perfil de {self.usuario.nome}'

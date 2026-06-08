@@ -168,3 +168,11 @@ EASY_AUDIT = {
     'LOGGING_BACKEND': 'easyaudit.backends.ModelBackend',  # padrão
     'REGISTER_REQUEST_MIDDLEWARE': True,  # auditar requisições
 }
+
+
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', 're_6iH6dPfU_BcvypGyFpgaQkqvH6AzhuAd9')
