@@ -11,7 +11,7 @@ resend.api_key = settings.RESEND_API_KEY
 def enviar_email_boas_vindas(self, usuario_email, usuario_nome):
     try:
         params = {
-            "from": "Sua Empresa <nao-responda@raijmobi.com>",
+            "from": "onboarding@resend.dev",
             "to": [usuario_email],
             "subject": "Bem-vindo à nossa plataforma!",
             "html": f"""
