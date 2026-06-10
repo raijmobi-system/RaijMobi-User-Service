@@ -1,39 +1,26 @@
 from rest_framework import status, generics, permissions
 from rest_framework.parsers import MultiPartParser, FormParser
-from .models import Usuario
-from .serializers import (
-    UserRegistrationSerializer,
-    UserProfileSerializer,
-)
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework import status
 
-# class UserRegistrationView(generics.CreateAPIView):
-#     queryset = Usuario.objects.all()
-#     serializer_class = UserRegistrationSerializer
-#     permission_classes = [permissions.AllowAny]
-#     parser_classes = [MultiPartParser, FormParser]
 
-#     def create(self, request, *args, **kwargs):
-#         response = super().create(request, *args, **kwargs)
-#         # Dados que queremos enviar (garanta que o serializer já criou o usuário e o perfil)
-#         user = Usuario.objects.get(pk=response.data.get('id'))  # ou pegue da resposta
-#         perfil = user.perfil
-#         user_data = {
-#             'id': str(user.id),
-#             'name': user.nome,
-#             'email': user.email,
-#             'is_rider': perfil.tipo_usuario == 'Passageiro',  # ajuste conforme sua regra
-#             # outros campos se necessário (telefone, etc.)
-#         }
-#         try:
-#             send_user_created_event(user_data)
-#         except Exception as e:
-#             # log do erro, mas não interrompe a resposta HTTP
-#             print(f"Erro ao enviar evento Kafka: {e}")
-#         return response
+from .models import Usuario
+
+from google.oauth2 import id_token
+from google.auth.transport import requests
+
+from django.conf import settings
+from django.contrib.auth import get_user_model
+
+from .serializers import (
+    UserRegistrationSerializer,
+    UserProfileSerializer,
+)
+
+User = get_user_model()
 
 
 class UserRegistrationView(generics.CreateAPIView):
@@ -65,7 +52,6 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
     def get_object(self):
         return self.request.user.perfil
 
-# ... suas outras views
 
 class LogoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -80,3 +66,57 @@ class LogoutView(APIView):
             return Response({"detail": "Logout realizado com sucesso."}, status=status.HTTP_205_RESET_CONTENT)
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        
+class GoogleLoginView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request):
+        token = request.data.get("token")
+
+        if not token:
+            return Response(
+                {"detail": "Token não informado"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            google_data = id_token.verify_oauth2_token(
+                token,
+                requests.Request(),
+                settings.GOOGLE_CLIENT_ID,
+            )
+
+            # Garantir que o email foi validado pelo Google
+            if not google_data.get("email_verified"):
+                return Response(
+                    {"detail": "E-mail não verificado pelo Google"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            email = google_data["email"]
+            nome = google_data.get("name", "")
+
+            user = Usuario.objects.filter(email=email).first()
+
+            if user is None:
+                user = Usuario.objects.create_user(
+                    email=email,
+                    password=None,
+                    nome=nome,
+                )
+
+            refresh = RefreshToken.for_user(user)
+
+            return Response(
+                {
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh),
+                }
+            )
+
+        except ValueError:
+            return Response(
+                {"detail": "Token Google inválido"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )

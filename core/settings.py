@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'easyaudit',
     'user_service',
+    'google-auth',
 ]
 
 MIDDLEWARE = [
@@ -176,3 +177,8 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', 're_6iH6dPfU_BcvypGyFpgaQkqvH6AzhuAd9')
+
+
+GOOGLE_CLIENT_ID = (
+    "280025204211-ajjg1v1gudjr3hospi6116rdvlbllg2p.apps.googleusercontent.com"
+)
