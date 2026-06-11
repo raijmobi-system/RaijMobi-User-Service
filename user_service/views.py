@@ -143,3 +143,65 @@ class PasswordResetRequestView(APIView):
         PasswordResetRequest.objects.create(usuario=user)
 
         return Response({"detail": "Solicitação de redefinição de senha enviada."}, status=status.HTTP_201_CREATED)
+    
+
+
+from django.http import JsonResponse
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+
+import json
+
+@csrf_exempt # Se for uma API separada, ou use a proteção CSRF padrão se for um form Django
+def reset_password_view(request):
+    
+    # 1. RECONHECIMENTO DO LINK (Método GET)
+    # Quando o usuário clica no e-mail, ele abre essa rota via GET para renderizar a página ou checar se o link é válido
+    if request.method == 'GET':
+        token_url = request.GET.get('token')
+        
+        if not token_url:
+            return JsonResponse({'error': 'Token ausente.'}, status=400)
+            
+        try:
+            reset_req = PasswordResetRequest.objects.get(token=token_url)
+            
+            # Validações de segurança
+            if reset_req.used_at is not None:
+                return JsonResponse({'error': 'Este link já foi utilizado.'}, status=400)
+            if reset_req.is_expired(hours_valid=2): # Usando o método que criamos no modelo
+                return JsonResponse({'error': 'Este link expirou.'}, status=400)
+                
+            return JsonResponse({'message': 'Token válido. Prossiga para a alteração de senha.'}, status=200)
+            
+        except PasswordResetRequest.DoesNotExist:
+            return JsonResponse({'error': 'Token inválido.'}, status=404)
+
+
+    # 2. PROCESSAMENTO DA NOVA SENHA (Método POST)
+    # Quando o usuário digita a nova senha na tela e clica em "Salvar"
+    elif request.method == 'POST':
+        token_url = request.GET.get('token') # Também pega o token da URL no envio do form
+        data = json.loads(request.body)
+        nova_senha = data.get('nova_senha')
+        
+        try:
+            reset_req = PasswordResetRequest.objects.get(token=token_url)
+            
+            # Repete as checagens por segurança antes de salvar a senha
+            if reset_req.used_at or reset_req.is_expired():
+                return JsonResponse({'error': 'Operação inválida ou expirada.'}, status=400)
+            
+            # Atualiza a senha do usuário associado
+            usuario = reset_req.usuario
+            usuario.set_password(nova_senha)
+            usuario.save()
+            
+            # Invalida o token para não ser reutilizado
+            reset_req.used_at = timezone.now()
+            reset_req.save()
+            
+            return JsonResponse({'success': 'Senha alterada com sucesso!'})
+            
+        except PasswordResetRequest.DoesNotExist:
+            return JsonResponse({'error': 'Token inválido.'}, status=404)

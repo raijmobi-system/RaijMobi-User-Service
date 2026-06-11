@@ -16,14 +16,20 @@ import os
 
 import environ
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 ALLOWED_HOSTS = ['*']
 
 env = environ.Env(
     DEBUG=(bool, True)
 )
 
+# SECURITY WARNING: don't run with debug turned on in production!
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+
+DEBUG = True
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+
 
 RESEND_API_KEY = env('RESEND_API_KEY')
 
@@ -34,8 +40,7 @@ GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID')
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-(x-9q@fyfpu&cc%0p7=0a+=5p_aa2m*###8w8xm&$p_ep$x4ks'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+
 
 
 # Application definition
