@@ -14,22 +14,33 @@ from pathlib import Path
 from datetime import timedelta
 import os
 
+import environ
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 ALLOWED_HOSTS = ['*']
 
+env = environ.Env(
+    DEBUG=(bool, True)
+)
 
+# SECURITY WARNING: don't run with debug turned on in production!
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+
+DEBUG = True
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+RESEND_API_KEY = env('RESEND_API_KEY')
+
+GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-(x-9q@fyfpu&cc%0p7=0a+=5p_aa2m*###8w8xm&$p_ep$x4ks'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+
 
 
 # Application definition
@@ -46,6 +57,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'easyaudit',
     'user_service',
+    
 ]
 
 MIDDLEWARE = [
@@ -168,3 +180,10 @@ EASY_AUDIT = {
     'LOGGING_BACKEND': 'easyaudit.backends.ModelBackend',  # padrão
     'REGISTER_REQUEST_MIDDLEWARE': True,  # auditar requisições
 }
+
+
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+

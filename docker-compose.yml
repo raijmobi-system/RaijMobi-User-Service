@@ -1,5 +1,4 @@
 services:
-
   zookeeper-user:
     image: confluentinc/cp-zookeeper:7.5.0
     environment:
@@ -24,6 +23,15 @@ services:
     networks:
       - raijmobi-network
 
+  # 1. NOVO SERVIÇO: O Broker (Redis)
+  redis-user:
+    image: redis:alpine
+    container_name: redis-user
+    ports:
+      - "6379:6379"
+    networks:
+      - raijmobi-network
+
   user-service:
     build:
       context: .
@@ -41,15 +49,39 @@ services:
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka-user:9092
       - ALLOWED_HOSTS=*
-      - DJANGO_SUPERUSER_EMAIL=admin@raijmobi.com
+      - DJANGO_SUPERUSER_EMAIL=pablo.murilo10@hotmail.com
       - DJANGO_SUPERUSER_NOME=Admin
-      - DJANGO_SUPERUSER_PASSWORD=suasenhaaqui
+      - DJANGO_SUPERUSER_PASSWORD=am@21star
+      # Novas variáveis para o Celery e Resend
+      - CELERY_BROKER_URL=redis://redis-user:6379/0
+      - RESEND_API_KEY=sua_chave_do_resend_aqui
     depends_on:
       - kafka-user
+      - redis-user # API agora espera o Redis subir
     container_name: user-service
     networks:
       - raijmobi-network
 
+  
+  celery-worker-user:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    # Note que usamos 'core' baseando-se no 'core.asgi' do seu user-service
+    command: celery -A core worker --loglevel=info
+    environment:
+      # O worker precisa das mesmas variáveis de ambiente que a API
+      # pois ele carrega toda a aplicação Django em memória
+      - KAFKA_BOOTSTRAP_SERVERS=kafka-user:9092
+      - ALLOWED_HOSTS=*
+      - CELERY_BROKER_URL=redis://redis-user:6379/0
+      - RESEND_API_KEY=re_6iH6dPfU_BcvypGyFpgaQkqvH6AzhuAd9
+    depends_on:
+      - kafka-user
+      - redis-user
+      - user-service 
+    networks:
+      - raijmobi-network
 
 networks:
   raijmobi-network:
