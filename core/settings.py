@@ -14,14 +14,20 @@ from pathlib import Path
 from datetime import timedelta
 import os
 
+import environ
 
 ALLOWED_HOSTS = ['*']
 
+env = environ.Env(
+    DEBUG=(bool, True)
+)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+RESEND_API_KEY = env('RESEND_API_KEY')
 
+GOOGLE_CLIENT_ID = env('GOOGLE_CLIENT_ID')
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
@@ -29,7 +35,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-(x-9q@fyfpu&cc%0p7=0a+=5p_aa2m*###8w8xm&$p_ep$x4ks'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 
 # Application definition
@@ -176,9 +182,3 @@ CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
-RESEND_API_KEY = os.environ.get('RESEND_API_KEY', 're_6iH6dPfU_BcvypGyFpgaQkqvH6AzhuAd9')
-
-
-GOOGLE_CLIENT_ID = (
-    "280025204211-ajjg1v1gudjr3hospi6116rdvlbllg2p.apps.googleusercontent.com"
-)
