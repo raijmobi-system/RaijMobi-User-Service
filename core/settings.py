@@ -46,7 +46,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'easyaudit',
     'user_service',
-    'google-auth',
+    
 ]
 
 MIDDLEWARE = [

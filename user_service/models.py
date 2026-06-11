@@ -3,9 +3,117 @@ from django.db import models
 from .validators import validar_cpf
 import uuid
 from django.utils import timezone
+from easyaudit.models import CRUDEvent
+from django.contrib.contenttypes.models import ContentType
+from .manager import UsuarioManager,SoftDeleteManager
+from django.utils.translation import gettext_lazy as _
 
-from .manager import UsuarioManager
 
+
+
+class CreatedAtMixin(models.Model):
+    created_at = models.DateTimeField(
+        _("Created at"),
+        auto_now_add=True,
+        editable=False
+    )
+
+    class Meta:
+        abstract = True
+
+
+class UpdatedAtMixin(models.Model):
+    updated_at = models.DateTimeField(
+        _("Updated at"),
+        auto_now=True,
+    )
+
+    class Meta:
+        abstract = True
+
+
+class CreatedByMixin(models.Model):
+    created_by = models.ForeignKey(
+        'user_service.Usuario',
+        verbose_name=_("Created by"),
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="created_%(app_label)s_%(class)s_set",
+    )
+
+    class Meta:
+        abstract = True
+
+
+class UpdatedByMixin(models.Model):
+    updated_by = models.ForeignKey(
+        'user_service.Usuario',
+        verbose_name=_("Updated by"),
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="updated_%(app_label)s_%(class)s_set",
+    )
+
+    class Meta:
+        abstract = True
+
+
+# ==========================================
+# 3. MIXINS AGRUPADOS
+# ==========================================
+class TimeStampedModel(CreatedAtMixin, UpdatedAtMixin):
+    class Meta:
+        abstract = True
+
+
+class UserTrackedModel(CreatedByMixin, UpdatedByMixin):
+    class Meta:
+        abstract = True
+
+
+# ==========================================
+# 4. BASES GENÉRICAS
+# ==========================================
+class UUIDModel(models.Model):
+    uuid = models.UUIDField(
+        unique=True,
+        editable=False,
+        default=uuid.uuid4
+    )
+
+    class Meta:
+        abstract = True
+
+
+class SoftDeleteModel(models.Model):
+    is_deleted = models.BooleanField(default=False)
+
+    objects = SoftDeleteManager()
+    all_objects = models.Manager()
+
+    def delete(self, *args, **kwargs):
+        self.is_deleted = True
+        self.save()
+
+    class Meta:
+        abstract = True
+
+
+# ==========================================
+# 5. MODELO USUÁRIO
+# ==========================================
+
+# ==========================================
+# 6. MODELOS BASE
+# ==========================================
+class BaseModel(UUIDModel, TimeStampedModel, UserTrackedModel):
+    class Meta:
+        abstract = True
+
+
+class BaseModelWithSoftDelete(BaseModel, SoftDeleteModel):
+    class Meta:
+        abstract = True
 
 class Usuario(AbstractBaseUser, PermissionsMixin):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -46,10 +154,35 @@ class Perfil(models.Model):
     def __str__(self):
         return f'Perfil de {self.usuario.nome}'
 
-# usuarios/models.py (ou audit/models.py)
-from django.db import models
-from easyaudit.models import CRUDEvent
-from django.contrib.contenttypes.models import ContentType
+
+class PasswordResetRequest(BaseModelWithSoftDelete):
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False
+    )
+
+    usuario = models.ForeignKey(
+        Usuario,
+        on_delete=models.CASCADE
+    )
+
+    token = models.CharField(
+        max_length=255,
+        unique=True
+    )
+
+
+    used_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
+    def is_expired(self, hours_valid=2):
+        expiration_time = self.created_at + timezone.timedelta(hours=hours_valid)
+        return timezone.now() > expiration_time
+
+
 
 class UsuarioAudit(CRUDEvent):
     class Meta:

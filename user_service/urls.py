@@ -11,7 +11,7 @@ urlpatterns = [
     path('profile/', views.UserProfileView.as_view(), name='user-profile'),
 
     path(
-        "api/auth/google/",
+        "auth/google/",
         GoogleLoginView.as_view(),
         name="google-login"
     ),

@@ -7,13 +7,15 @@ from rest_framework.views import APIView
 from rest_framework import status
 
 
-from .models import Usuario
+from .models import Usuario, PasswordResetRequest
 
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 
 from .serializers import (
     UserRegistrationSerializer,
@@ -120,3 +122,24 @@ class GoogleLoginView(APIView):
                 {"detail": "Token Google inválido"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        
+
+
+class PasswordResetRequestView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email")
+
+        if not email:
+            return Response({"detail": "Email é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = Usuario.objects.filter(email=email).first()
+
+        if not user:
+            return Response({"detail": "Usuário não encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        
+        PasswordResetRequest.objects.create(usuario=user)
+
+        return Response({"detail": "Solicitação de redefinição de senha enviada."}, status=status.HTTP_201_CREATED)
