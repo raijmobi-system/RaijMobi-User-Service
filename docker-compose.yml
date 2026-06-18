@@ -47,6 +47,7 @@ services:
     ports:
       - "8003:8000"
     environment:
+      - GOOGLE_CLIENT_ID=fake-google-client-id
       - KAFKA_BOOTSTRAP_SERVERS=kafka-user:9092
       - ALLOWED_HOSTS=*
       - DJANGO_SUPERUSER_EMAIL=pablo.murilo10@hotmail.com
