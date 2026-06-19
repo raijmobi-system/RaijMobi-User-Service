@@ -40,6 +40,7 @@ services:
       sh -c "
         python manage.py makemigrations user_service --noinput &&
         python manage.py migrate &&
+        python manage.py migrate easyaudit --noinput &&   
         python manage.py createsuperuser --noinput || true &&
         python manage.py collectstatic --noinput &&
         uvicorn core.asgi:application --host 0.0.0.0 --port 8000

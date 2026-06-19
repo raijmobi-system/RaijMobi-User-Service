@@ -5,6 +5,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
+import json
 
 
 from .models import Usuario, PasswordResetRequest
@@ -149,9 +150,12 @@ class PasswordResetRequestView(APIView):
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 
-import json
 
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
 @csrf_exempt # Se for uma API separada, ou use a proteção CSRF padrão se for um form Django
 def reset_password_view(request):
     
