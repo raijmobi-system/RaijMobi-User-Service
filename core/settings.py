@@ -57,6 +57,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'easyaudit',
     'user_service',
+    'django_prometheus',
     
 ]
 
@@ -70,6 +71,9 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'easyaudit.middleware.easyaudit.EasyAuditMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware', 
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
+     "django_prometheus.middleware.PrometheusAfterMiddleware",
+
 ]
 
 ROOT_URLCONF = 'core.urls'
