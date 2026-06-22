@@ -10,6 +10,9 @@ import json
 
 from .models import Usuario, PasswordResetRequest
 
+from .metrics import users_total,drivers_total,passengers_total
+from .metrics import logouts_total,google_logins_total,password_reset_requests_total
+
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
@@ -35,6 +38,14 @@ class UserRegistrationView(generics.CreateAPIView):
     def perform_create(self, serializer):
         user = serializer.save()   # já cria usuário + perfil
         perfil = user.perfil
+
+        users_total.inc()
+
+        if perfil.is_motorista:
+            drivers_total.inc()
+        else:
+            passengers_total.inc()
+
         user_data = {
             'id': str(user.id),
             'name': user.nome,
@@ -66,6 +77,7 @@ class LogoutView(APIView):
                 return Response({"detail": "Refresh token é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
             token = RefreshToken(refresh_token)
             token.blacklist()
+            logouts_total.inc()
             return Response({"detail": "Logout realizado com sucesso."}, status=status.HTTP_205_RESET_CONTENT)
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
@@ -111,6 +123,8 @@ class GoogleLoginView(APIView):
 
             refresh = RefreshToken.for_user(user)
 
+            google_logins_total.inc()
+
             return Response(
                 {
                     "access": str(refresh.access_token),
@@ -142,6 +156,8 @@ class PasswordResetRequestView(APIView):
 
         
         PasswordResetRequest.objects.create(usuario=user)
+
+        password_reset_requests_total.inc()
 
         return Response({"detail": "Solicitação de redefinição de senha enviada."}, status=status.HTTP_201_CREATED)
     
