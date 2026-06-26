@@ -119,8 +119,29 @@ services:
     networks:
       - raijmobi-network
 
+  maintenance-cron:
+    build:
+      context: .
+      dockerfile: Dockerfile.cron
+    container_name: maintenance-cron
+    environment:
+      - DB_NAME=${DB_NAME:-raijmobi_user_db}
+      - DB_USER=${DB_USER:-raijmobi_user}
+      - DB_PASSWORD=${DB_PASSWORD:-raijmobi_pass}
+      - DB_HOST=postgres-user
+      - DB_PORT=5432
+    depends_on:
+      postgres-user:
+        condition: service_healthy
+    networks:
+      - raijmobi-network
+    volumes:
+      - ./db_scripts:/scripts   # (opcional) para facilitar edição sem rebuild
+      - maintenance-logs:/var/log   # (opcional) persistir logs
+
 volumes:
   postgres_data:
+  maintenance-logs:   
 
 networks:
   raijmobi-network:
