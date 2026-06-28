@@ -113,6 +113,30 @@ services:
     networks:
       - raijmobi-network
 
+  db-backup:
+    build:
+      context: /home/pc/Documentos/raijmobi-system/RaijMobi-Services-postgres-backups/User-service        # <-- agora aponta para a nova pasta
+      dockerfile: Dockerfile
+    container_name: postgres-user-db-backup
+    environment:
+      - DB_HOST=postgres-user
+      - DB_PORT=5432
+      - DB_NAME=raijmobi_user_db
+      - DB_USER=raijmobi_user
+      - DB_PASSWORD=raijmobi_pass
+      - BACKUP_DIR=/backups
+      - BACKUP_INTERVAL_SECONDS=86400   # 24 horas
+      - RETENTION_DAYS=7                # opcional, mantém últimos 7 dias
+      - TZ=America/Sao_Paulo
+    volumes:
+      - backup_user_data:/backups
+    networks:
+      - raijmobi-network
+    depends_on:
+      postgres-user:
+        condition: service_healthy
+
+
   celery-worker-user:
     build:
       context: .
@@ -140,6 +164,7 @@ services:
 
 volumes:
   postgres_user_data:
+  backup_user_data: 
   
 networks:
   raijmobi-network:
