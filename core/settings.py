@@ -186,17 +186,11 @@ SIMPLE_JWT = {
 }
 
 
-EJABY_AUDIT = {
-    'MODELS': [
-        'token_blacklist.BlacklistedToken',
-        # outros modelos que queira auditar
-    ],
-}
 
 
 EASY_AUDIT = {
-    'LOGGING_BACKEND': 'easyaudit.backends.ModelBackend',  # padrão
-    'REGISTER_REQUEST_MIDDLEWARE': True,  # auditar requisições
+    'LOGGING_BACKEND': 'easyaudit.backends.ModelBackend',
+    'REGISTER_REQUEST_MIDDLEWARE': True,
 }
 
 
@@ -205,3 +199,4 @@ CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

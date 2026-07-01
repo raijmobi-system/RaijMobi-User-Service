@@ -10,7 +10,6 @@ from django.utils.translation import gettext_lazy as _
 
 
 
-
 class CreatedAtMixin(models.Model):
     created_at = models.DateTimeField(
         _("Created at"),
@@ -181,17 +180,3 @@ class PasswordResetRequest(BaseModelWithSoftDelete):
     def is_expired(self, hours_valid=2):
         expiration_time = self.created_at + timezone.timedelta(hours=hours_valid)
         return timezone.now() > expiration_time
-
-
-
-class UsuarioAudit(CRUDEvent):
-    class Meta:
-        proxy = True
-        verbose_name = 'Auditoria de Usuário'
-        verbose_name_plural = 'Auditorias de Usuários'
-
-class PerfilAudit(CRUDEvent):
-    class Meta:
-        proxy = True
-        verbose_name = 'Auditoria de Perfil'
-        verbose_name_plural = 'Auditorias de Perfis'
