@@ -115,7 +115,7 @@ services:
 
   db-backup:
     build:
-      context: /home/pc/Documentos/raijmobi-system/RaijMobi-Services-postgres-backups/User-service        # <-- agora aponta para a nova pasta
+      context: ../RaijMobi-Services-postgres-backups/User-service        # <-- agora aponta para a nova pasta
       dockerfile: Dockerfile
     container_name: postgres-user-db-backup
     environment:
