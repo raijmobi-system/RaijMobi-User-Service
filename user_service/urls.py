@@ -1,7 +1,11 @@
 from django.urls import path
 from . import views
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .views import UserRegistrationView, UserProfileView, LogoutView,GoogleLoginView,reset_password_view
+from .views import (UserRegistrationView,
+                     UserProfileView, 
+                     LogoutView,GoogleLoginView,
+                     reset_password_view,
+                     CompleteProfileView)
 
 urlpatterns = [
     path('register/', views.UserRegistrationView.as_view(), name='register'),
@@ -15,5 +19,6 @@ urlpatterns = [
         GoogleLoginView.as_view(),
         name="google-login"
     ),
+    path("profile/complete/", CompleteProfileView.as_view(), name="complete-profile"), # 👈 Nova rota!
     path('reset-password', views.reset_password_view, name='reset-password'),
 ]

@@ -1,14 +1,15 @@
 from rest_framework import status, generics, permissions
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser,JSONParser
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework import status
+from rest_framework import permissions
 import json
 
 
-from .models import Usuario, PasswordResetRequest
+from .models import Usuario, PasswordResetRequest,Perfil
 
 from .metrics import users_total,drivers_total,passengers_total
 from .metrics import logouts_total,google_logins_total,password_reset_requests_total
@@ -33,7 +34,7 @@ class UserRegistrationView(generics.CreateAPIView):
     queryset = Usuario.objects.all()
     serializer_class = UserRegistrationSerializer
     permission_classes = [permissions.AllowAny]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser,JSONParser]
 
     def perform_create(self, serializer):
         user = serializer.save()   # já cria usuário + perfil
@@ -61,7 +62,7 @@ class UserRegistrationView(generics.CreateAPIView):
 class UserProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = UserProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]  # importante para upload de foto
+    parser_classes = [MultiPartParser, FormParser, JSONParser]  # importante para upload de foto
 
     def get_object(self):
         return self.request.user.perfil
@@ -84,16 +85,12 @@ class LogoutView(APIView):
         
 class GoogleLoginView(APIView):
     authentication_classes = []
-    permission_classes = []
+    permission_classes = [permissions.AllowAny]
 
     def post(self, request):
         token = request.data.get("token")
-
         if not token:
-            return Response(
-                {"detail": "Token não informado"},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return Response({"detail": "Token não informado"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             google_data = id_token.verify_oauth2_token(
@@ -102,42 +99,37 @@ class GoogleLoginView(APIView):
                 settings.GOOGLE_CLIENT_ID,
             )
 
-            # Garantir que o email foi validado pelo Google
             if not google_data.get("email_verified"):
-                return Response(
-                    {"detail": "E-mail não verificado pelo Google"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
+                return Response({"detail": "E-mail não verificado pelo Google"}, status=status.HTTP_400_BAD_REQUEST)
 
             email = google_data["email"]
             nome = google_data.get("name", "")
 
-            user = Usuario.objects.filter(email=email).first()
-
-            if user is None:
-                user = Usuario.objects.create_user(
-                    email=email,
-                    password=None,
-                    nome=nome,
-                )
+            user, created = Usuario.objects.get_or_create(
+                email=email,
+                defaults={"nome": nome}
+            )
 
             refresh = RefreshToken.for_user(user)
-
             google_logins_total.inc()
 
-            return Response(
-                {
-                    "access": str(refresh.access_token),
-                    "refresh": str(refresh),
-                }
-            )
+            # Verifica se o usuário já possui perfil criado
+            has_profile = hasattr(user, 'perfil')
 
-        except ValueError:
+            return Response({
+                "access": str(refresh.access_token),
+                "refresh": str(refresh),
+                "is_new_user": created or not has_profile, # Front-end usa isso para redirecionar
+            })
+
+        except ValueError as e:
+            # 🌟 IMPRIME O ERRO NO TERMINAL DO DOCKER:
+            print(f"❌ ERRO REAL DA VALIDAÇÃO GOOGLE: {e}")
+            # 🌟 RETORNA O ERRO PRO FRONTEND VER NO ALERT:
             return Response(
-                {"detail": "Token Google inválido"},
-                status=status.HTTP_400_BAD_REQUEST,
+                {"detail": f"Token Google inválido: {str(e)}"}, 
+                status=status.HTTP_400_BAD_REQUEST
             )
-        
 
 
 class PasswordResetRequestView(APIView):
@@ -225,3 +217,81 @@ def reset_password_view(request):
             
         except PasswordResetRequest.DoesNotExist:
             return JsonResponse({'error': 'Token inválido.'}, status=404)
+        
+
+# Adicione no seu views.py
+
+class CompleteProfileView(APIView):
+    """
+    Endpoint para usuários cadastrados via Google completarem o perfil
+    (Enviando CPF, Telefone e Tipo de Usuário).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def post(self, request):
+        print("📦 DADOS CHEGANDO NO COMPLETE PROFILE:", request.data)
+        user = request.user
+
+        # 1. Verifica se já possui perfil
+        if hasattr(user, 'perfil'):
+            return Response(
+                {"detail": "Este usuário já possui um perfil completo."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        cpf = request.data.get("cpf")
+        telefone = request.data.get("telefone")
+        tipo_usuario = request.data.get("tipo_usuario")
+
+        if not all([cpf, telefone, tipo_usuario]):
+            return Response(
+                {"detail": "CPF, telefone e tipo de usuário são obrigatórios."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            # 2. Cria a instância do perfil
+            perfil = Perfil(
+                usuario=user,
+                cpf=cpf,
+                telefone=telefone,
+                tipo_usuario=tipo_usuario,
+                foto=request.FILES.get("foto", None),
+                is_motorista=(tipo_usuario == 'Motorista')
+            )
+            
+            # 🌟 Força a validação explícita (dispara o validar_cpf para capturar mensagens claras)
+            perfil.full_clean()
+            perfil.save()
+
+            # 3. Dispara evento Kafka
+            user_data = {
+                'id': str(user.id),
+                'name': user.nome,
+                'email': user.email,
+                'is_driver': perfil.is_motorista, 
+            }
+            try:
+                from .kafka_producer import send_user_created_event
+                send_user_created_event(user_data)
+            except Exception as e:
+                print(f"⚠️ Erro ao enviar evento Kafka no CompleteProfile: {e}")
+
+            return Response({"detail": "Perfil completado com sucesso!"}, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            # 🌟 IMPRIME O ERRO EXATO NO TERMINAL DO DOCKER:
+            print(f"❌ ERRO REAL AO SALVAR PERFIL: {e}")
+            
+            # Formata a mensagem de erro para o Frontend
+            mensagem_erro = str(e)
+            if hasattr(e, 'message_dict'):
+                mensagem_erro = e.message_dict
+            elif hasattr(e, 'messages'):
+                mensagem_erro = e.messages
+
+            return Response(
+                {"detail": mensagem_erro}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
