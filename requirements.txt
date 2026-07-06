@@ -11,4 +11,5 @@ redis>=5.0.0
 resend>=0.7.0
 google-auth>=2.53.0
 django-environ>=0.13.0
-django_prometheus
+psycopg2-binary
+django-prometheus

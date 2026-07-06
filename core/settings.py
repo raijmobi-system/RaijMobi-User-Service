@@ -99,10 +99,24 @@ WSGI_APPLICATION = 'core.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+
+
+import os
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('DB_NAME', 'raijmobi_user_db'),
+        'USER': os.environ.get('DB_USER', 'raijmobi_user'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'senha_segura'),
+        'HOST': os.environ.get('DB_HOST', 'postgres-user'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
     }
 }
 
@@ -172,17 +186,11 @@ SIMPLE_JWT = {
 }
 
 
-EJABY_AUDIT = {
-    'MODELS': [
-        'token_blacklist.BlacklistedToken',
-        # outros modelos que queira auditar
-    ],
-}
 
 
 EASY_AUDIT = {
-    'LOGGING_BACKEND': 'easyaudit.backends.ModelBackend',  # padrão
-    'REGISTER_REQUEST_MIDDLEWARE': True,  # auditar requisições
+    'LOGGING_BACKEND': 'easyaudit.backends.ModelBackend',
+    'REGISTER_REQUEST_MIDDLEWARE': True,
 }
 
 
@@ -191,3 +199,4 @@ CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
