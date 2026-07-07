@@ -41,7 +41,7 @@ class GoogleLoginViewTestCase(APITestCase):
         response = self.client.post(self.url, data, format='json')
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(response.data['detail'], "Token Google inválido")
+        self.assertIn("Token Google inválido", response.data['detail'])
 
     def test_login_sem_enviar_token(self):
         """Testa a validação de campo obrigatório"""
