@@ -1,0 +1,80 @@
+name: CI do User Service
+
+on:
+  push:
+    branches: [ "main", "develop" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    environment: ci-user   # 👈 usa o ambiente com os secrets
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: raijmobi_user_db
+          POSTGRES_USER: raijmobi_user
+          POSTGRES_PASSWORD: ${{ secrets.DB_PASSWORD }}   # ⚠️ será necessário criar esse secret
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+
+    env:
+      # --- Segredos do ambiente ci-user ---
+      GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+      RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+
+      # --- Conexão com o banco (via secrets do repositório ou ambiente) ---
+      DB_NAME: raijmobi_user_db
+      DB_USER: raijmobi_user
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      DB_HOST: localhost
+      DB_PORT: 5432
+
+      # --- Outras variáveis sensíveis (criar secrets também) ---
+      SECRET_KEY: ${{ secrets.SECRET_KEY }}
+
+      # --- Configurações não sensíveis (podem ficar fixas) ---
+      CELERY_BROKER_URL: redis://localhost:6379/0
+      KAFKA_BOOTSTRAP_SERVERS: kafka-user:9092
+      ALLOWED_HOSTS: '*'
+      DJANGO_SUPERUSER_EMAIL: admin@test.com
+      DJANGO_SUPERUSER_NOME: Admin
+      DJANGO_SUPERUSER_PASSWORD: test123
+
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Executar migrações
+        run: python manage.py migrate --noinput
+
+      - name: Rodar testes
+        run: python manage.py test
+
+      - name: Verificar build do Docker (opcional)
+        run: |
+          docker build -t user-service .
+          docker run --rm user-service echo "Build OK"
