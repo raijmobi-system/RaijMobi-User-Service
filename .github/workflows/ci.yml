@@ -9,7 +9,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    environment: ci-user   # ambiente usado para GOOGLE_CLIENT_ID e RESEND_API_KEY (secrets)
+    environment: ci-user
 
     services:
       postgres:
@@ -17,7 +17,7 @@ jobs:
         env:
           POSTGRES_DB: raijmobi_user_db
           POSTGRES_USER: raijmobi_user
-          POSTGRES_PASSWORD: senha_segura          # valor fixo, mesmo padrão do settings.py
+          POSTGRES_PASSWORD: senha_segura
         ports:
           - 5432:5432
         options: >-
@@ -32,22 +32,14 @@ jobs:
           - 6379:6379
 
     env:
-      # --- Conexão com o banco (valores do DATABASES padrão) ---
       DB_NAME: raijmobi_user_db
       DB_USER: raijmobi_user
       DB_PASSWORD: senha_segura
-      DB_HOST: localhost               # serviço mapeado para localhost
+      DB_HOST: localhost
       DB_PORT: 5432
-
-      # --- Google e Resend (ainda podem vir do ambiente ci-user se existirem como secrets,
-      #     mas para hardcode total, substitua pelas strings desejadas) ---
-      # Se quiser ignorar os secrets e colocar direto, descomente as linhas abaixo e
-      # remova/altere as que usam ${{ secrets... }}.
       GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
       RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-
-      # --- Configurações não sensíveis ---
-      SECRET_KEY: 'django-insecure-ci-test-key'     # chave fixa para testes
+      SECRET_KEY: 'django-insecure-ci-test-key'
       CELERY_BROKER_URL: redis://localhost:6379/0
       KAFKA_BOOTSTRAP_SERVERS: kafka-user:9092
       ALLOWED_HOSTS: '*'
@@ -68,6 +60,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Criar migrações (makemigrations)
+        run: python manage.py makemigrations user_service --noinput
 
       - name: Executar migrações
         run: python manage.py migrate --noinput
