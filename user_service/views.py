@@ -1,40 +1,54 @@
-from rest_framework import status, generics, permissions
-from rest_framework.parsers import MultiPartParser, FormParser,JSONParser
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from rest_framework_simplejwt.tokens import RefreshToken
+import json
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from django.http import JsonResponse
+from django.utils import timezone
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.views.decorators.csrf import csrf_exempt
+
+# REST Framework imports
+from rest_framework import generics, permissions, status
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework import status
-from rest_framework import permissions
-import json
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-
-from .models import Usuario, PasswordResetRequest,Perfil
-
-from .metrics import users_total,drivers_total,passengers_total
-from .metrics import logouts_total,google_logins_total,password_reset_requests_total
-
+# Google Auth
 from google.oauth2 import id_token
 from google.auth.transport import requests
 
-from django.conf import settings
-from django.contrib.auth import get_user_model
-from django.utils.encoding import force_bytes
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+# Easy Audit
+from easyaudit.models import CRUDEvent
 
-from .serializers import (
-    UserRegistrationSerializer,
-    UserProfileSerializer,
+# Modelos e Serializadores Locais
+from .models import Usuario, PasswordResetRequest, Perfil
+from .serializers import UserRegistrationSerializer, UserProfileSerializer
+
+# Métricas Prometheus
+from .metrics import (
+    users_total,
+    drivers_total,
+    passengers_total,
+    logouts_total,
+    google_logins_total,
+    password_reset_requests_total
 )
 
 User = get_user_model()
 
 
+# ==========================================
+# 1. CADASTRO DE USUÁRIO
+# ==========================================
 class UserRegistrationView(generics.CreateAPIView):
     queryset = Usuario.objects.all()
     serializer_class = UserRegistrationSerializer
     permission_classes = [permissions.AllowAny]
-    parser_classes = [MultiPartParser, FormParser,JSONParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def perform_create(self, serializer):
         user = serializer.save()   # já cria usuário + perfil
@@ -58,7 +72,11 @@ class UserRegistrationView(generics.CreateAPIView):
             send_user_created_event(user_data)
         except Exception as e:
             print(f"Erro ao enviar evento Kafka: {e}")
-            
+
+
+# ==========================================
+# 2. PERFIL DE USUÁRIO
+# ==========================================
 class UserProfileView(generics.RetrieveUpdateAPIView):
     serializer_class = UserProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
@@ -68,6 +86,9 @@ class UserProfileView(generics.RetrieveUpdateAPIView):
         return self.request.user.perfil
 
 
+# ==========================================
+# 3. LOGOUT E SISTEMA DE SESSÃO
+# ==========================================
 class LogoutView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -82,7 +103,11 @@ class LogoutView(APIView):
             return Response({"detail": "Logout realizado com sucesso."}, status=status.HTTP_205_RESET_CONTENT)
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
-        
+
+
+# ==========================================
+# 4. AUTENTICAÇÃO GOOGLE
+# ==========================================
 class GoogleLoginView(APIView):
     authentication_classes = []
     permission_classes = [permissions.AllowAny]
@@ -123,104 +148,16 @@ class GoogleLoginView(APIView):
             })
 
         except ValueError as e:
-            # 🌟 IMPRIME O ERRO NO TERMINAL DO DOCKER:
             print(f"❌ ERRO REAL DA VALIDAÇÃO GOOGLE: {e}")
-            # 🌟 RETORNA O ERRO PRO FRONTEND VER NO ALERT:
             return Response(
                 {"detail": f"Token Google inválido: {str(e)}"}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
 
-class PasswordResetRequestView(APIView):
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request):
-        email = request.data.get("email")
-
-        if not email:
-            return Response({"detail": "Email é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
-
-        user = Usuario.objects.filter(email=email).first()
-
-        if not user:
-            return Response({"detail": "Usuário não encontrado."}, status=status.HTTP_404_NOT_FOUND)
-
-        
-        PasswordResetRequest.objects.create(usuario=user)
-
-        password_reset_requests_total.inc()
-
-        return Response({"detail": "Solicitação de redefinição de senha enviada."}, status=status.HTTP_201_CREATED)
-    
-
-
-from django.http import JsonResponse
-from django.utils import timezone
-from django.views.decorators.csrf import csrf_exempt
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-
-
-@api_view(['GET', 'POST'])
-@permission_classes([AllowAny])
-@csrf_exempt # Se for uma API separada, ou use a proteção CSRF padrão se for um form Django
-def reset_password_view(request):
-    
-    # 1. RECONHECIMENTO DO LINK (Método GET)
-    # Quando o usuário clica no e-mail, ele abre essa rota via GET para renderizar a página ou checar se o link é válido
-    if request.method == 'GET':
-        token_url = request.GET.get('token')
-        
-        if not token_url:
-            return JsonResponse({'error': 'Token ausente.'}, status=400)
-            
-        try:
-            reset_req = PasswordResetRequest.objects.get(token=token_url)
-            
-            # Validações de segurança
-            if reset_req.used_at is not None:
-                return JsonResponse({'error': 'Este link já foi utilizado.'}, status=400)
-            if reset_req.is_expired(hours_valid=2): # Usando o método que criamos no modelo
-                return JsonResponse({'error': 'Este link expirou.'}, status=400)
-                
-            return JsonResponse({'message': 'Token válido. Prossiga para a alteração de senha.'}, status=200)
-            
-        except PasswordResetRequest.DoesNotExist:
-            return JsonResponse({'error': 'Token inválido.'}, status=404)
-
-
-    # 2. PROCESSAMENTO DA NOVA SENHA (Método POST)
-    # Quando o usuário digita a nova senha na tela e clica em "Salvar"
-    elif request.method == 'POST':
-        token_url = request.GET.get('token') # Também pega o token da URL no envio do form
-        data = json.loads(request.body)
-        nova_senha = data.get('nova_senha')
-        
-        try:
-            reset_req = PasswordResetRequest.objects.get(token=token_url)
-            
-            # Repete as checagens por segurança antes de salvar a senha
-            if reset_req.used_at or reset_req.is_expired():
-                return JsonResponse({'error': 'Operação inválida ou expirada.'}, status=400)
-            
-            # Atualiza a senha do usuário associado
-            usuario = reset_req.usuario
-            usuario.set_password(nova_senha)
-            usuario.save()
-            
-            # Invalida o token para não ser reutilizado
-            reset_req.used_at = timezone.now()
-            reset_req.save()
-            
-            return JsonResponse({'success': 'Senha alterada com sucesso!'})
-            
-        except PasswordResetRequest.DoesNotExist:
-            return JsonResponse({'error': 'Token inválido.'}, status=404)
-        
-
-# Adicione no seu views.py
-
+# ==========================================
+# 5. COMPLETAR PERFIL (PÓS-GOOGLE)
+# ==========================================
 class CompleteProfileView(APIView):
     """
     Endpoint para usuários cadastrados via Google completarem o perfil
@@ -261,7 +198,7 @@ class CompleteProfileView(APIView):
                 is_motorista=(tipo_usuario == 'Motorista')
             )
             
-            # 🌟 Força a validação explícita (dispara o validar_cpf para capturar mensagens claras)
+            # Força a validação explícita
             perfil.full_clean()
             perfil.save()
 
@@ -281,10 +218,8 @@ class CompleteProfileView(APIView):
             return Response({"detail": "Perfil completado com sucesso!"}, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            # 🌟 IMPRIME O ERRO EXATO NO TERMINAL DO DOCKER:
             print(f"❌ ERRO REAL AO SALVAR PERFIL: {e}")
             
-            # Formata a mensagem de erro para o Frontend
             mensagem_erro = str(e)
             if hasattr(e, 'message_dict'):
                 mensagem_erro = e.message_dict
@@ -292,6 +227,132 @@ class CompleteProfileView(APIView):
                 mensagem_erro = e.messages
 
             return Response(
-                {"detail": mensagem_erro}, 
+                {"detail": mensaje_erro}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+# ==========================================
+# 6. REDEFINIÇÃO DE SENHA
+# ==========================================
+class PasswordResetRequestView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        email = request.data.get("email")
+
+        if not email:
+            return Response({"detail": "Email é obrigatório."}, status=status.HTTP_400_BAD_REQUEST)
+
+        user = Usuario.objects.filter(email=email).first()
+
+        if not user:
+            return Response({"detail": "Usuário não encontrado."}, status=status.HTTP_404_NOT_FOUND)
+
+        PasswordResetRequest.objects.create(usuario=user)
+        password_reset_requests_total.inc()
+
+        return Response({"detail": "Solicitação de redefinição de senha enviada."}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([AllowAny])
+@csrf_exempt
+def reset_password_view(request):
+    # 1. RECONHECIMENTO DO LINK (Método GET)
+    if request.method == 'GET':
+        token_url = request.GET.get('token')
+        
+        if not token_url:
+            return JsonResponse({'error': 'Token ausente.'}, status=400)
+            
+        try:
+            reset_req = PasswordResetRequest.objects.get(token=token_url)
+            
+            if reset_req.used_at is not None:
+                return JsonResponse({'error': 'Este link já foi utilizado.'}, status=400)
+            if reset_req.is_expired(hours_valid=2):
+                return JsonResponse({'error': 'Este link expirou.'}, status=400)
+                
+            return JsonResponse({'message': 'Token válido. Prossiga para a alteração de senha.'}, status=200)
+            
+        except PasswordResetRequest.DoesNotExist:
+            return JsonResponse({'error': 'Token inválido.'}, status=404)
+
+    # 2. PROCESSAMENTO DA NOVA SENHA (Método POST)
+    elif request.method == 'POST':
+        token_url = request.GET.get('token')
+        data = json.loads(request.body)
+        nova_senha = data.get('nova_senha')
+        
+        try:
+            reset_req = PasswordResetRequest.objects.get(token=token_url)
+            
+            if reset_req.used_at or reset_req.is_expired():
+                return JsonResponse({'error': 'Operação inválida ou expirada.'}, status=400)
+            
+            usuario = reset_req.usuario
+            usuario.set_password(nova_senha)
+            usuario.save()
+            
+            reset_req.used_at = timezone.now()
+            reset_req.save()
+            
+            return JsonResponse({'success': 'Senha alterada com sucesso!'})
+            
+        except PasswordResetRequest.DoesNotExist:
+            return JsonResponse({'error': 'Token inválido.'}, status=404)
+
+
+# ==========================================
+# 7. LOGS DE AUDITORIA DO ADMIN (EASY-AUDIT)
+# ==========================================
+class AdminLogsView(APIView):
+    """
+    Endpoint para retornar os logs de auditoria salvos pelo django-easy-audit.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        try:
+            busca = request.query_params.get('busca', '')
+            
+            # Puxa os logs ordenados pelo mais recente
+            eventos = CRUDEvent.objects.all().order_by('-datetime')
+
+            if busca and busca.strip() != "":
+                eventos = eventos.filter(object_repr__icontains=busca)
+
+            dados_logs = []
+            
+            # Limitador preventivo de performance (últimos 50 itens)
+            for ev in eventos[:50]:
+                try:
+                    # Converte de forma segura o timezone do banco para o local
+                    data_local = timezone.localtime(ev.datetime)
+                    data_str = data_local.strftime('%d/%m/%Y')
+                    hora_str = data_local.strftime('%H:%M:%S')
+                except Exception:
+                    data_str = "N/A"
+                    hora_str = "N/A"
+
+                # Trata o campo de usuário defensivamente contra nulos
+                usuario_nome = "Sistema"
+                if ev.user:
+                    usuario_nome = getattr(ev.user, 'nome', getattr(ev.user, 'email', str(ev.user)))
+
+                dados_logs.append({
+                    "id": ev.id,
+                    "quem_mexeu": usuario_nome,
+                    "data": data_str,
+                    "hora": hora_str,
+                    "microsservico": "User Service",
+                    "acao": ev.get_event_type_display() if hasattr(ev, 'get_event_type_display') else "Alteração",
+                    "no_que_mexeu": str(ev.object_repr)
+                })
+
+            return Response(dados_logs, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            # Captura a falha para evitar que o Kong Gateway envie o erro genérico 502
+            return Response({"erro": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
